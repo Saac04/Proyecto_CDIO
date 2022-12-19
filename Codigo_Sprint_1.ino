@@ -1,15 +1,22 @@
 #include <Adafruit_ADS1X15.h>
-#define channelValue0 0      //Defino canal 0 (Para el sesor de humedad)
-#define channelValue1 1      //Defino canal 1 (Para el sesor de temperatura)
-#define channelValue2 2      //Defino canal 2 (Para el sesor de pH)
+#define channelValue0 0      //Defino canal 0 (Para el sensor de humedad)
+#define channelValue1 1      //Defino canal 1 (Para el sensor de temperatura)
+#define channelValue2 2      //Defino canal 2 (Para el sensor de pH)
+#define channelValue3 3      //Defino canal 3 (Para el sensor de luz)
 
 //-----Datos necesarios para el sensor de ph-------------------------
-#define Offset 1.78                                                  
+#define Offset 0.36                                                  
 #define samplingInterval 20                                          
 #define printInterval 800                                            
 #define ArrayLength 40
 int pHArray[ArrayLength];
 int pHArrayIndex=0;                                               
+//-------------------------------------------------------------------
+
+//-----Datos necesarios para el sensor de Salinidad------------------
+int salinityValue = 0;       //Defino variable humedad               
+const int Salado = 108;    //Defino valor en mojado
+const int no_Salado = 76;      //Defino valor en seco
 //-------------------------------------------------------------------
 
 //-----Datos necesarios para el sensor de Humedad--------------------
@@ -32,7 +39,7 @@ struct Data{
 //#define PRINT_HTTP_RESPONSE
 
 // Comentar/Descomentar para conexion Fuera/Dentro de UPV
-//#define WiFi_CONNECTION_UPV
+#define WiFi_CONNECTION_UPV
 
 // Selecciona que servidor REST quieres utilizar entre ThingSpeak y Dweet
 #define REST_SERVER_THINGSPEAK //Selecciona tu canal para ver los datos en la web (https://thingspeak.com/channels/360979)
@@ -81,7 +88,7 @@ WiFiClient client;
   String MyWriteAPIKey="cdiocurso2018g12"; // Escribe la clave de tu canal Dweet
 #endif
 
-#define NUM_FIELDS_TO_SEND 4 //Numero de medidas a enviar al servidor REST (Entre 1 y 8)
+#define NUM_FIELDS_TO_SEND 5 //Numero de medidas a enviar al servidor REST (Entre 1 y 8)
 
 /////////////////////////////////////////////////////
 /////////////// Pin Definitions ////////////////
@@ -244,78 +251,83 @@ void setup() {
   Serial.println("Rango del ADC: +/- 4.096V (1 bit=2mV)");
 }
 
-//-----Sensor de Humedad-----------------------------------------------------
-int humedadMapeo(){
-  int16_t adc0;
-  adc0 = ads1115.readADC_SingleEnded(channelValue0);      //Lectura del adc
-  
-  humidityValue = map(adc0,0,1023,0,255);   //Convertir valores en % 
-  int humidityValue2 = 100*Seco/(Seco-Mojado)-humidityValue*100/(Seco-Mojado);   //Convertir valores en % 
+int mapeo(int adc){
+  int mapValue = map(adc,0,1023,0,255); 
+  return mapValue;
+}
 
-  if (humidityValue2 < 0){
+//-----Sensor de Humedad-----------------------------------------------------
+int humedad(int channelValue){
+  int16_t adc;
+  adc = ads1115.readADC_SingleEnded(channelValue);      //Lectura del adc
+  
+  int humidityValue1 = mapeo(adc);   //Convertir valores en % 
+  int humidityValue2 = 100*Seco/(Seco-Mojado)-humidityValue1*100/(Seco-Mojado);   //Convertir valores en % 
+
+  if (humidityValue2 < 100 && humidityValue2 > 0){
     /*Serial.print(" Humedad (%): ");
     Serial.print(humidityValue2,DEC);         //Muestro el valor en pantalla
     Serial.println("%");*/
     return humidityValue2;
   }
-  else{
-    //Serial.println("no se humedad");
+  
+  if(humidityValue2 > 100){
+    
+    return 100;
+  }
+    
+  if(humidityValue2 < 0){
+    
+    //Serial.println("no hay humedad");
     return 0;
   }
 }
 //---------------------------------------------------------------------------
 
 //-----Sensor de Salinidad---------------------------------------------------
-double lagrange(Data f[], int xi, int n){  //funcion del polinomio de Lagrange
-    double res = 0; // se crea la variable resultado
- 
-    for (int i=0; i<n; i++){
-        //calcula los elementos individuales de la formula de Lagrange
-        double calculo = f[i].y;
-        for (int j=0; j<n; j++){
-          if (j!=i){
-            calculo = calculo*(xi - f[j].x)/double(f[i].x - f[j].x);
-          }
-        }
-        //El calculo hecho se añade al resultado final
-        res += calculo;
-    }
- 
-    return res;
-}
 
-int salinidad(){
+int salinidad(int channelValue){
   int sol=0;
-  int16_t adc0;
+  int16_t adc;
 
   digitalWrite(power_pin, HIGH);
   delay(100);
 
-  adc0 = analogRead(A0); //leemos el valor del adc
+  adc = analogRead(channelValue); //leemos el valor del adc
+
+  int mapeoSalinidad = mapeo(adc);
+  int valorSalinidad = 100*no_Salado/(no_Salado-Salado)-adc*100/(no_Salado-Salado);; 
+  
+  
   digitalWrite(power_pin, LOW);
 
   //Serial.print("Lectura digital de la sal =");
   //Serial.println(adc0, DEC);
 
-  Data f[] = {{288,0}, {382,5}, {397,10}, {424,15},{436,20}};
-  // estos valores son los digitales por gramos, respectivamente
-  sol=lagrange(f, adc0, 5); // se llama a la funcion, siendo 5 el numero de muestras
-  if (sol < 0){
-    /*Serial.print(sol);
-    Serial.println(" gramos");*/
-    return sol;
+  if (valorSalinidad  < 100 && valorSalinidad  > 0){
+    /*Serial.print(" Humedad (%): ");
+    Serial.print(humidityValue2,DEC);         //Muestro el valor en pantalla
+    Serial.println("%");*/
+    return valorSalinidad ;
   }
-  else{
-    //Serial.println("no se detecta sal");
+  
+  if(valorSalinidad  > 100){
+    
+    return 100;
+  }
+    
+  if(valorSalinidad  < 0){
+    
+    //Serial.println("no hay humedad");
     return 0;
   }
 }
 //---------------------------------------------------------------------------
 
 //-----Sensor de Temperatura-------------------------------------------------
-double temperatura(){
+double temperatura(int channelValue){
   
-  int16_t adc=ads1115.readADC_SingleEnded(channelValue1);      //Lectura del adc;
+  int16_t adc=ads1115.readADC_SingleEnded(channelValue);      //Lectura del adc;
   double temperatura;
   double m = 33*pow(10,-3);  
   double b = 0.79;
@@ -339,74 +351,92 @@ double averageSample(int cuantos, int *p){
   return media;
 }
 
-float pH(){
+float pH(int channelValue){
 
   static unsigned long samplingTime = millis();
   static unsigned long printTime = millis();
-  static float pHValue, voltage;
+  static float pHValue, voltage, voltage_digital;
   if(millis() - samplingTime > samplingInterval){
 
-     pHArray[pHArrayIndex++]=ads1115.readADC_SingleEnded(channelValue2);      //Lectura del adc;
+     pHArray[pHArrayIndex++]=ads1115.readADC_SingleEnded(channelValue);      //Lectura del adc;
 
   }
     
   if (pHArrayIndex == ArrayLength){
     pHArrayIndex=0;
     
-    voltage = (averageSample(ArrayLength,& pHArray[0]))/10000;
+    voltage_digital = (averageSample(ArrayLength,& pHArray[0]));
+    voltage = voltage_digital*4.096/32767;
     pHValue = 3.5 * voltage + Offset;
     samplingTime = millis();
   }
   if(millis() - printTime > printInterval){
       
-     /*Serial.print("Voltage: "); 
+     Serial.print("Voltage: "); 
      Serial.println(voltage, 2); 
      Serial.print("pH Value: "); 
      Serial.println(pHValue, 2); 
-      printTime = millis();*/
+      printTime = millis();
      return pHValue;
   }
 }
 //---------------------------------------------------------------------------
 
+//----------Sensor de luz----------------------------------------------------
+double luz(int channelValue){
+  int16_t adc=ads1115.readADC_SingleEnded(channelValue3);      //Lectura del adc;
+
+  double v_out=(adc*4.096)/32767;
+  return v_out;
+   
+}
+//---------------------------------------------------------------------------
 void loop() { 
   
 String data[ NUM_FIELDS_TO_SEND + 1];  // Podemos enviar hasta 8 datos
 
     
-    data[ 1 ] = String(humedadMapeo()); //Escribimos el dato 1. Recuerda actualizar numFields
+    data[ 1 ] = String(humedad(channelValue0)); //Escribimos el dato 1. Recuerda actualizar numFields
     #ifdef PRINT_DEBUG_MESSAGES
         Serial.print( "Humedad = " );
         Serial.print( data[ 1 ] );
         Serial.println("%");
     #endif
 
-    data[ 2 ] = String(salinidad()); //Escribimos el dato 2. Recuerda actualizar numFields
+    data[ 2 ] = String(salinidad(A0)); //Escribimos el dato 2. Recuerda actualizar numFields
     #ifdef PRINT_DEBUG_MESSAGES
         Serial.print( "Salinidad = " );
         Serial.print( data[ 2 ] );
-        Serial.println("g");
+        Serial.println("%");
     #endif
 
-    data[ 3 ] = String(temperatura()); //Escribimos el dato 3. Recuerda actualizar numFields
+    data[ 3 ] = String(temperatura(channelValue1)); //Escribimos el dato 3. Recuerda actualizar numFields
     #ifdef PRINT_DEBUG_MESSAGES
         Serial.print( "temperatura = " );
         Serial.print( data[ 3 ] );
         Serial.println("ºC");
     #endif
 
-    data[ 4 ] = String(pH()); //Escribimos el dato 4. Recuerda actualizar numFields
+    data[ 4 ] = String(pH(channelValue2)); //Escribimos el dato 4. Recuerda actualizar numFields
     #ifdef PRINT_DEBUG_MESSAGES
         Serial.print( "pH = " );
         Serial.println( data[ 4 ] );
     #endif
+
+    data[ 5 ] = String(luz(channelValue3)); //Escribimos el dato 5. Recuerda actualizar numFields
+    #ifdef PRINT_DEBUG_MESSAGES
+        Serial.print( "Intensidad luminosa = " );
+        Serial.print( data[ 5 ] );
+        Serial.println("%");
+    #endif
+    
 
     //Selecciona si quieres enviar con GET(ThingSpeak o Dweet) o con POST(ThingSpeak)
     //HTTPPost( data, NUM_FIELDS_TO_SEND );
     HTTPGet( data, NUM_FIELDS_TO_SEND );
 
     //Selecciona si quieres un retardo de 15seg para hacer pruebas o dormir el SparkFun
-    delay( 15000 );   
+    delay( 1000 );   
     //Serial.print( "Goodnight" );
     //ESP.deepSleep( sleepTimeSeconds * 1000000 );
 
