@@ -372,10 +372,10 @@ float pH(int channelValue){
   }
   if(millis() - printTime > printInterval){
       
-     Serial.print("Voltage: "); 
-     Serial.println(voltage, 2); 
-     Serial.print("pH Value: "); 
-     Serial.println(pHValue, 2); 
+     //Serial.print("Voltage: "); 
+     //Serial.println(voltage, 2); 
+     //Serial.print("pH Value: "); 
+     //Serial.println(pHValue, 2); 
       printTime = millis();
      return pHValue;
   }
@@ -427,7 +427,6 @@ String data[ NUM_FIELDS_TO_SEND + 1];  // Podemos enviar hasta 8 datos
     #ifdef PRINT_DEBUG_MESSAGES
         Serial.print( "Intensidad luminosa = " );
         Serial.print( data[ 5 ] );
-        Serial.println("%");
     #endif
     
 
