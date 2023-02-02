@@ -1,11 +1,10 @@
-#include <Adafruit_ADS1X15.h>
 #define channelValue0 0      //Defino canal 0 (Para el sensor de humedad)
 #define channelValue1 1      //Defino canal 1 (Para el sensor de temperatura)
-#define channelValue2 2      //Defino canal 2 (Para el sensor de pH)
-#define channelValue3 3      //Defino canal 3 (Para el sensor de luz)
+#define channelValue2 2      //Defino canal 2 (Para el sensor de luz)
+#define channelValue3 3      //Defino canal 3 (Para el sensor de pH)
 
 //-----Datos necesarios para el sensor de ph-------------------------
-#define Offset 0.36                                                  
+#define Offset 0.37                                                  
 #define samplingInterval 20                                          
 #define printInterval 800                                            
 #define ArrayLength 40
@@ -21,8 +20,8 @@ const int no_Salado = 76;      //Defino valor en seco
 
 //-----Datos necesarios para el sensor de Humedad--------------------
 int humidityValue = 0;       //Defino variable humedad               
-const int Mojado = 4195;    //Defino valor en mojado
-const int Seco = 7568;      //Defino valor en seco
+unsigned int Mojado = 17000;    //Defino valor en mojado 4195
+unsigned int Seco = 30406;      //Defino valor en seco  7568
 //-------------------------------------------------------------------
 
 #define power_pin 5      
@@ -30,8 +29,7 @@ Adafruit_ADS1115 ads1115;
 struct Data{
     int x;
     int y;
-};       
-
+};
 #include <ESP8266WiFi.h>
 
 // Comentar/Descomentar para ver mensajes de depuracion en monitor serie y/o respuesta del HTTP server
@@ -261,13 +259,15 @@ int humedad(int channelValue){
   int16_t adc;
   adc = ads1115.readADC_SingleEnded(channelValue);      //Lectura del adc
   
-  int humidityValue1 = mapeo(adc);   //Convertir valores en % 
+  int humidityValue1 = adc;   //Convertir valores en % 
   int humidityValue2 = 100*Seco/(Seco-Mojado)-humidityValue1*100/(Seco-Mojado);   //Convertir valores en % 
 
-  if (humidityValue2 < 100 && humidityValue2 > 0){
     /*Serial.print(" Humedad (%): ");
-    Serial.print(humidityValue2,DEC);         //Muestro el valor en pantalla
+    Serial.print(humidityValue1);         //Muestro el valor en pantalla
     Serial.println("%");*/
+
+  if (humidityValue2 < 100 && humidityValue2 > 0){
+
     return humidityValue2;
   }
   
@@ -289,20 +289,19 @@ int humedad(int channelValue){
 int salinidad(int channelValue){
   int sol=0;
   int16_t adc;
-
   digitalWrite(power_pin, HIGH);
   delay(100);
 
   adc = analogRead(channelValue); //leemos el valor del adc
 
-  int mapeoSalinidad = mapeo(adc);
+  int mapeoSalinidad = adc;
   int valorSalinidad = 100*no_Salado/(no_Salado-Salado)-adc*100/(no_Salado-Salado);; 
   
   
   digitalWrite(power_pin, LOW);
 
-  //Serial.print("Lectura digital de la sal =");
-  //Serial.println(adc0, DEC);
+  Serial.print("Lectura digital de la sal =");
+  Serial.println(channelValue, DEC);
 
   if (valorSalinidad  < 100 && valorSalinidad  > 0){
     /*Serial.print(" Humedad (%): ");
@@ -332,10 +331,10 @@ double temperatura(int channelValue){
   double m = 33*pow(10,-3);  
   double b = 0.79;
   double vo = (adc * 4.096 )/32767;
-  temperatura = (((vo*0.644) - b)/m);
+  temperatura = (((vo*0.79  ) - b)/m);
 
-  /*Serial.print("Temperatura: ");
-  Serial.println(temperatura);*/
+  //Serial.print("Vo: ");
+  //Serial.println(vo);
   return temperatura;
    
 }
@@ -360,7 +359,7 @@ float pH(int channelValue){
 
      pHArray[pHArrayIndex++]=ads1115.readADC_SingleEnded(channelValue);      //Lectura del adc;
 
-  }
+  } 
     
   if (pHArrayIndex == ArrayLength){
     pHArrayIndex=0;
@@ -384,59 +383,10 @@ float pH(int channelValue){
 
 //----------Sensor de luz----------------------------------------------------
 double luz(int channelValue){
-  int16_t adc=ads1115.readADC_SingleEnded(channelValue3);      //Lectura del adc;
+  int16_t adc=ads1115.readADC_SingleEnded(channelValue);      //Lectura del adc;
 
   double v_out=(adc*4.096)/32767;
   return v_out;
    
 }
 //---------------------------------------------------------------------------
-void loop() { 
-  
-String data[ NUM_FIELDS_TO_SEND + 1];  // Podemos enviar hasta 8 datos
-
-    
-    data[ 1 ] = String(humedad(channelValue0)); //Escribimos el dato 1. Recuerda actualizar numFields
-    #ifdef PRINT_DEBUG_MESSAGES
-        Serial.print( "Humedad = " );
-        Serial.print( data[ 1 ] );
-        Serial.println("%");
-    #endif
-
-    data[ 2 ] = String(salinidad(A0)); //Escribimos el dato 2. Recuerda actualizar numFields
-    #ifdef PRINT_DEBUG_MESSAGES
-        Serial.print( "Salinidad = " );
-        Serial.print( data[ 2 ] );
-        Serial.println("%");
-    #endif
-
-    data[ 3 ] = String(temperatura(channelValue1)); //Escribimos el dato 3. Recuerda actualizar numFields
-    #ifdef PRINT_DEBUG_MESSAGES
-        Serial.print( "temperatura = " );
-        Serial.print( data[ 3 ] );
-        Serial.println("ºC");
-    #endif
-
-    data[ 4 ] = String(pH(channelValue2)); //Escribimos el dato 4. Recuerda actualizar numFields
-    #ifdef PRINT_DEBUG_MESSAGES
-        Serial.print( "pH = " );
-        Serial.println( data[ 4 ] );
-    #endif
-
-    data[ 5 ] = String(luz(channelValue3)); //Escribimos el dato 5. Recuerda actualizar numFields
-    #ifdef PRINT_DEBUG_MESSAGES
-        Serial.print( "Intensidad luminosa = " );
-        Serial.print( data[ 5 ] );
-    #endif
-    
-
-    //Selecciona si quieres enviar con GET(ThingSpeak o Dweet) o con POST(ThingSpeak)
-    //HTTPPost( data, NUM_FIELDS_TO_SEND );
-    HTTPGet( data, NUM_FIELDS_TO_SEND );
-
-    //Selecciona si quieres un retardo de 15seg para hacer pruebas o dormir el SparkFun
-    delay( 1000 );   
-    //Serial.print( "Goodnight" );
-    //ESP.deepSleep( sleepTimeSeconds * 1000000 );
-
-}       //utilizado para llamar las  funciones
